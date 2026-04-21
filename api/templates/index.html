@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>E-Commerce Retention Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+
+<body>
+    <div class="container">
+        <h1>Customer Retention Manager</h1>
+        <p>Enter a Customer ID to calculate their real-time flight risk.</p>
+
+        <div class="search-box">
+            <input type="text" id="customerId" placeholder="e.g., 50001" value="50001">
+            <button onclick="runPrediction()">Analyze Risk</button>
+        </div>
+
+        <div id="resultCard" class="card hidden">
+            <h2 id="riskStatus"></h2>
+            <div class="metrics">
+                <div class="metric">
+                    <span>Churn Probability</span>
+                    <strong id="churnProb"></strong>
+                </div>
+                <div class="metric">
+                    <span>Tenure (Months)</span>
+                    <strong id="custTenure"></strong>
+                </div>
+                <div class="metric">
+                    <span>Recent Complaints</span>
+                    <strong id="custComplain"></strong>
+                </div>
+            </div>
+            <div id="actionPlan" class="action-plan"></div>
+            <div id="shapInsight" class="shap-insight hidden"
+                style="margin-top: 15px; padding: 10px; background-color: #e8f4f8; border-left: 4px solid #3498db; font-size: 14px;">
+                <strong>🤖 AI Insight:</strong> The primary factor driving this score is <span id="topDriver"
+                    style="font-weight: bold; color: #c0392b;"></span>.
+            </div>
+        </div>
+    </div>
+
+    <script>
+        async function runPrediction() {
+            const custId = document.getElementById('customerId').value;
+            const resultCard = document.getElementById('resultCard');
+            const riskStatus = document.getElementById('riskStatus');
+            const actionPlan = document.getElementById('actionPlan');
+            const shapInsight = document.getElementById('shapInsight');
+
+            try {
+                const response = await fetch('/predict', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ customer_id: parseInt(custId) })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    resultCard.classList.remove('hidden');
+                    document.getElementById('churnProb').innerText = data.churn_probability + '%';
+                    document.getElementById('custTenure').innerText = data.tenure;
+                    document.getElementById('custComplain').innerText = data.complaints;
+
+                    // --- NEW: Populate Dynamic SHAP Insight ---
+                    document.getElementById('topDriver').innerText = data.top_risk_factor;
+                    shapInsight.classList.remove('hidden');
+
+                    if (data.is_at_risk) {
+                        resultCard.style.borderTop = "5px solid #e74c3c";
+                        riskStatus.innerText = "⚠️ High Flight Risk";
+                        riskStatus.style.color = "#e74c3c";
+                        actionPlan.innerHTML = "<strong>Recommended Action:</strong> Trigger 20% personalized retention discount immediately.";
+                    } else {
+                        resultCard.style.borderTop = "5px solid #2ecc71";
+                        riskStatus.innerText = "✅ Loyal Customer";
+                        riskStatus.style.color = "#2ecc71";
+                        actionPlan.innerHTML = "<strong>Recommended Action:</strong> No discount needed. Continue standard marketing cadence.";
+                        // Hide SHAP insight for loyal customers to keep UI clean, or leave it to show why they are loyal
+                        shapInsight.classList.add('hidden');
+                    }
+                } else {
+                    alert(data.error);
+                }
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        }
+    </script>
+</body>
+
+</html>
