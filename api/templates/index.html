@@ -4,39 +4,291 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>E-Commerce Retention Dashboard</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <title>E-Commerce Retention Sandbox</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f7f6;
+            color: #333;
+            padding: 30px;
+            display: flex;
+            justify-content: center;
+        }
+
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            width: 850px;
+        }
+
+        h1 {
+            color: #2c3e50;
+            margin-top: 0;
+            margin-bottom: 5px;
+        }
+
+        .subtitle {
+            color: #7f8c8d;
+            margin-bottom: 25px;
+            font-size: 14px;
+        }
+
+        /* Tab Styles */
+        .tabs {
+            display: flex;
+            border-bottom: 2px solid #ecf0f1;
+            margin-bottom: 20px;
+        }
+
+        .tab-btn {
+            background: none;
+            border: none;
+            padding: 10px 20px;
+            font-size: 16px;
+            font-weight: bold;
+            color: #7f8c8d;
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+            margin-bottom: -2px;
+            transition: 0.3s;
+        }
+
+        .tab-btn:hover {
+            color: #2c3e50;
+        }
+
+        .tab-btn.active {
+            color: #3498db;
+            border-bottom: 3px solid #3498db;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        /* DB Search Styles */
+        .search-box {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .search-box input {
+            flex: 1;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+
+        /* Form Styles */
+        .form-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        label {
+            font-size: 11px;
+            font-weight: bold;
+            color: #7f8c8d;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+        }
+
+        input,
+        select {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        button {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            transition: 0.2s;
+        }
+
+        button:hover {
+            background: #2980b9;
+        }
+
+        .btn-full {
+            width: 100%;
+        }
+
+        /* Result Card Styles */
+        .card {
+            background: #fafafa;
+            padding: 20px;
+            border-radius: 5px;
+            margin-top: 25px;
+            border-top: 5px solid #ccc;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .metrics {
+            display: flex;
+            justify-content: space-between;
+            margin: 15px 0;
+        }
+
+        .metric {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .metric span {
+            font-size: 11px;
+            color: #7f8c8d;
+            text-transform: uppercase;
+        }
+
+        .metric strong {
+            font-size: 28px;
+            color: #2c3e50;
+        }
+
+        .action-plan {
+            background: #fff3cd;
+            color: #856404;
+            padding: 15px;
+            border-radius: 5px;
+            font-size: 14px;
+            margin-bottom: 10px;
+        }
+
+        .shap-insight {
+            background-color: #e8f4f8;
+            border-left: 4px solid #3498db;
+            padding: 10px;
+            font-size: 14px;
+        }
+
+        .badge {
+            background: #eee;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            float: right;
+            color: #666;
+        }
+    </style>
 </head>
 
 <body>
     <div class="container">
-        <h1>Customer Retention Manager</h1>
-        <p>Enter a Customer ID to calculate their real-time flight risk.</p>
+        <h1>Retention Sandbox</h1>
+        <div class="subtitle">Query production databases or run what-if simulations.</div>
 
-        <div class="search-box">
-            <input type="text" id="customerId" placeholder="e.g., 50001" value="50001">
-            <button onclick="runPrediction()">Analyze Risk</button>
+        <div class="tabs">
+            <button class="tab-btn active" onclick="switchTab('db-tab')">🔍 Database Lookup</button>
+            <button class="tab-btn" onclick="switchTab('manual-tab')">🎛️ Manual Simulation</button>
+        </div>
+
+        <div id="db-tab" class="tab-content active">
+            <div class="search-box">
+                <input type="text" id="customerId" placeholder="Enter Customer ID (e.g., 50001)">
+                <button onclick="runDbPrediction()">Fetch & Analyze</button>
+            </div>
+            <p style="font-size: 13px; color: #7f8c8d;">Note: Searching a valid ID automatically pre-fills the Manual
+                Simulation tab for easy what-if testing.</p>
+        </div>
+
+        <div id="manual-tab" class="tab-content">
+            <div class="form-grid">
+                <div class="form-group"><label>Tenure (Months)</label><input type="number" id="Tenure" value="1"></div>
+                <div class="form-group"><label>City Tier</label><input type="number" id="CityTier" value="3"></div>
+                <div class="form-group"><label>Warehouse to Home</label><input type="number" id="WarehouseToHome"
+                        value="15"></div>
+                <div class="form-group"><label>Hours on App</label><input type="number" id="HourSpendOnApp" value="2">
+                </div>
+                <div class="form-group"><label>Devices Registered</label><input type="number"
+                        id="NumberOfDeviceRegistered" value="4"></div>
+                <div class="form-group"><label>Satisfaction (1-5)</label><input type="number" id="SatisfactionScore"
+                        value="2"></div>
+                <div class="form-group"><label>Number of Addresses</label><input type="number" id="NumberOfAddress"
+                        value="2"></div>
+                <div class="form-group"><label>Recent Complaints</label><input type="number" id="Complain" value="1">
+                </div>
+                <div class="form-group"><label>Order Amount Hike %</label><input type="number"
+                        id="OrderAmountHikeFromlastYear" value="12"></div>
+                <div class="form-group"><label>Coupons Used</label><input type="number" id="CouponUsed" value="1"></div>
+                <div class="form-group"><label>Order Count</label><input type="number" id="OrderCount" value="2"></div>
+                <div class="form-group"><label>Days Since Last Order</label><input type="number" id="DaySinceLastOrder"
+                        value="10"></div>
+                <div class="form-group"><label>Cashback Amount</label><input type="number" id="CashbackAmount"
+                        value="120"></div>
+
+                <div class="form-group">
+                    <label>Order Category</label>
+                    <select id="PreferedOrderCat">
+                        <option value="Mobile Phone">Mobile Phone</option>
+                        <option value="Laptop & Accessory">Laptop & Accessory</option>
+                        <option value="Fashion">Fashion</option>
+                        <option value="Grocery">Grocery</option>
+                        <option value="Others">Others</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Payment Mode</label>
+                    <select id="PreferredPaymentMode">
+                        <option value="Debit Card">Debit Card</option>
+                        <option value="Credit Card">Credit Card</option>
+                        <option value="E wallet">E wallet</option>
+                        <option value="UPI">UPI</option>
+                        <option value="Cash on Delivery">Cash on Delivery</option>
+                    </select>
+                </div>
+                <div class="form-group"><label>Gender</label><select id="Gender">
+                        <option value="Male">Male</option>
+                        <option value="Female">Female</option>
+                    </select></div>
+                <div class="form-group"><label>Marital Status</label><select id="MaritalStatus">
+                        <option value="Single">Single</option>
+                        <option value="Married">Married</option>
+                        <option value="Divorced">Divorced</option>
+                    </select></div>
+                <div class="form-group"><label>Login Device</label><select id="PreferredLoginDevice">
+                        <option value="Mobile Phone">Mobile Phone</option>
+                        <option value="Computer">Computer</option>
+                    </select></div>
+            </div>
+            <button class="btn-full" onclick="runManualSimulation()">Run AI Simulation</button>
         </div>
 
         <div id="resultCard" class="card hidden">
-            <h2 id="riskStatus"></h2>
+            <span id="sourceBadge" class="badge"></span>
+            <h2 id="riskStatus" style="margin-top: 0;"></h2>
+
             <div class="metrics">
-                <div class="metric">
-                    <span>Churn Probability</span>
-                    <strong id="churnProb"></strong>
-                </div>
-                <div class="metric">
-                    <span>Tenure (Months)</span>
-                    <strong id="custTenure"></strong>
-                </div>
-                <div class="metric">
-                    <span>Recent Complaints</span>
-                    <strong id="custComplain"></strong>
-                </div>
+                <div class="metric"><span>Churn Probability</span><strong id="churnProb"></strong></div>
             </div>
             <div id="actionPlan" class="action-plan"></div>
-            <div id="shapInsight" class="shap-insight hidden"
-                style="margin-top: 15px; padding: 10px; background-color: #e8f4f8; border-left: 4px solid #3498db; font-size: 14px;">
+            <div id="shapInsight" class="shap-insight hidden">
                 <strong>🤖 AI Insight:</strong> The primary factor driving this score is <span id="topDriver"
                     style="font-weight: bold; color: #c0392b;"></span>.
             </div>
@@ -44,51 +296,104 @@
     </div>
 
     <script>
-        async function runPrediction() {
-            const custId = document.getElementById('customerId').value;
+        // Tab Switching Logic
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            document.getElementById(tabId).classList.add('active');
+            event.currentTarget.classList.add('active');
+            document.getElementById('resultCard').classList.add('hidden'); // Hide old results on switch
+        }
+
+        // Handle UI Updates for both routes
+        function updateUI(data) {
             const resultCard = document.getElementById('resultCard');
             const riskStatus = document.getElementById('riskStatus');
             const actionPlan = document.getElementById('actionPlan');
             const shapInsight = document.getElementById('shapInsight');
+            const sourceBadge = document.getElementById('sourceBadge');
 
+            resultCard.classList.remove('hidden');
+            document.getElementById('churnProb').innerText = data.churn_probability + '%';
+            document.getElementById('topDriver').innerText = data.top_risk_factor;
+
+            sourceBadge.innerText = data.source === 'database' ? `Customer: ${data.customer_id}` : 'Simulated Data';
+
+            if (data.is_at_risk) {
+                resultCard.style.borderTopColor = "#e74c3c";
+                riskStatus.innerText = "⚠️ High Flight Risk";
+                riskStatus.style.color = "#e74c3c";
+                actionPlan.innerHTML = "<strong>Recommended Action:</strong> Trigger retention protocol immediately.";
+                shapInsight.classList.remove('hidden');
+            } else {
+                resultCard.style.borderTopColor = "#2ecc71";
+                riskStatus.innerText = "✅ Loyal Customer";
+                riskStatus.style.color = "#2ecc71";
+                actionPlan.innerHTML = "<strong>Recommended Action:</strong> No intervention needed.";
+                shapInsight.classList.add('hidden');
+            }
+        }
+
+        // Route 1: DB Fetch
+        async function runDbPrediction() {
+            const custId = document.getElementById('customerId').value;
             try {
-                const response = await fetch('/predict', {
+                const response = await fetch('/predict_db', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ customer_id: parseInt(custId) })
+                    body: JSON.stringify({ customer_id: custId })
                 });
-
                 const data = await response.json();
 
                 if (response.ok) {
-                    resultCard.classList.remove('hidden');
-                    document.getElementById('churnProb').innerText = data.churn_probability + '%';
-                    document.getElementById('custTenure').innerText = data.tenure;
-                    document.getElementById('custComplain').innerText = data.complaints;
-
-                    // --- NEW: Populate Dynamic SHAP Insight ---
-                    document.getElementById('topDriver').innerText = data.top_risk_factor;
-                    shapInsight.classList.remove('hidden');
-
-                    if (data.is_at_risk) {
-                        resultCard.style.borderTop = "5px solid #e74c3c";
-                        riskStatus.innerText = "⚠️ High Flight Risk";
-                        riskStatus.style.color = "#e74c3c";
-                        actionPlan.innerHTML = "<strong>Recommended Action:</strong> Trigger 20% personalized retention discount immediately.";
-                    } else {
-                        resultCard.style.borderTop = "5px solid #2ecc71";
-                        riskStatus.innerText = "✅ Loyal Customer";
-                        riskStatus.style.color = "#2ecc71";
-                        actionPlan.innerHTML = "<strong>Recommended Action:</strong> No discount needed. Continue standard marketing cadence.";
-                        // Hide SHAP insight for loyal customers to keep UI clean, or leave it to show why they are loyal
-                        shapInsight.classList.add('hidden');
+                    updateUI(data);
+                    // Pre-fill the manual form with the fetched data!
+                    for (const [key, value] of Object.entries(data.raw_features)) {
+                        const inputElement = document.getElementById(key);
+                        if (inputElement) {
+                            // Handle missing values cleanly
+                            inputElement.value = (value === null || isNaN(value) && typeof value !== 'string') ? '' : value;
+                        }
                     }
                 } else {
-                    alert(data.error);
+                    alert("Error: " + data.error);
                 }
-            } catch (error) {
-                console.error('Error:', error);
-            }
+            } catch (error) { console.error('Error:', error); }
+        }
+
+        // Route 2: Manual Submission
+        async function runManualSimulation() {
+            const payload = {
+                Tenure: parseFloat(document.getElementById('Tenure').value),
+                CityTier: parseInt(document.getElementById('CityTier').value),
+                WarehouseToHome: parseFloat(document.getElementById('WarehouseToHome').value),
+                HourSpendOnApp: parseFloat(document.getElementById('HourSpendOnApp').value),
+                NumberOfDeviceRegistered: parseInt(document.getElementById('NumberOfDeviceRegistered').value),
+                SatisfactionScore: parseInt(document.getElementById('SatisfactionScore').value),
+                NumberOfAddress: parseInt(document.getElementById('NumberOfAddress').value),
+                Complain: parseInt(document.getElementById('Complain').value),
+                OrderAmountHikeFromlastYear: parseFloat(document.getElementById('OrderAmountHikeFromlastYear').value),
+                CouponUsed: parseFloat(document.getElementById('CouponUsed').value),
+                OrderCount: parseFloat(document.getElementById('OrderCount').value),
+                DaySinceLastOrder: parseFloat(document.getElementById('DaySinceLastOrder').value),
+                CashbackAmount: parseFloat(document.getElementById('CashbackAmount').value),
+                PreferedOrderCat: document.getElementById('PreferedOrderCat').value,
+                PreferredPaymentMode: document.getElementById('PreferredPaymentMode').value,
+                Gender: document.getElementById('Gender').value,
+                MaritalStatus: document.getElementById('MaritalStatus').value,
+                PreferredLoginDevice: document.getElementById('PreferredLoginDevice').value
+            };
+
+            try {
+                const response = await fetch('/predict_manual', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await response.json();
+                if (response.ok) updateUI(data);
+                else alert("Error: " + data.error);
+            } catch (error) { console.error('Error:', error); }
         }
     </script>
 </body>

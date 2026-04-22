@@ -4,21 +4,20 @@ import sqlite3
 import pandas as pd
 import joblib
 import shap
-import os
+import traceback
 
 app = Flask(__name__)
 
+# 1. Load the trained pipeline at server startup
 pipeline_path = '../artifacts/churn_pipeline_v1.joblib'
 try:
     model_pipeline = joblib.load(pipeline_path)
     print("ML Pipeline loaded successfully.")
     
-    # Initialize SHAP Explainer
     preprocessor = model_pipeline.named_steps['preprocessor']
     lgbm_model = model_pipeline.named_steps['classifier'].estimators_[2]
     explainer = shap.TreeExplainer(lgbm_model)
     print("SHAP Explainer initialized.")
-    
 except Exception as e:
     print(f"CRITICAL ERROR: Could not load pipeline: {e}")
 
@@ -29,20 +28,40 @@ def get_db_connection():
     conn.row_factory = sqlite3.Row
     return conn
 
-@app.errorhandler(404)
-def not_found_error(error):
-    return jsonify({'error': 'Resource not found'}), 404
-
-@app.errorhandler(500)
-def internal_error(error):
-    return jsonify({'error': 'Internal server error. Please check the backend logs.'}), 500
+def calculate_shap_and_prediction(features_df):
+    """Helper function to run inference and SHAP for both routes"""
+    # 1. Predict
+    probability = model_pipeline.predict_proba(features_df)[0][1]
+    is_at_risk = bool(probability >= 0.35)
+    
+    # 2. SHAP
+    X_transformed = preprocessor.transform(features_df)
+    shap_values = explainer.shap_values(X_transformed)
+    individual_shap = shap_values[1][0] if isinstance(shap_values, list) else shap_values[0]
+    
+    # 3. Extract features
+    num_cols = preprocessor.transformers_[0][2] 
+    cat_cols = preprocessor.transformers_[1][2] 
+    try:
+        cat_encoder = preprocessor.named_transformers_['cat'].named_steps['onehot']
+        cat_names = cat_encoder.get_feature_names_out(cat_cols)
+        all_feature_names = list(num_cols) + list(cat_names)
+    except:
+        all_feature_names = list(features_df.columns)
+        
+    impacts = {name: val for name, val in zip(all_feature_names, individual_shap[:len(all_feature_names)])}
+    top_driver = sorted(impacts.items(), key=lambda item: item[1], reverse=True)[0]
+    top_risk_factor = top_driver[0].replace('_', ' ')
+    
+    return probability, is_at_risk, top_risk_factor
 
 @app.route('/', methods=['GET'])
 def index():
     return render_template('index.html')
 
-@app.route('/predict', methods=['POST'])
-def predict_churn():
+# --- ROUTE 1: Database Lookup ---
+@app.route('/predict_db', methods=['POST'])
+def predict_db():
     try:
         data = request.get_json()
         customer_id = data.get('customer_id')
@@ -60,60 +79,48 @@ def predict_churn():
             
         features_df = customer_data.drop(['CustomerID', 'Churn'], axis=1, errors='ignore')
         
-        # Run inference
-        probability = model_pipeline.predict_proba(features_df)[0][1]
-        threshold = 0.35
-        is_at_risk = bool(probability >= threshold)
+        probability, is_at_risk, top_risk_factor = calculate_shap_and_prediction(features_df)
         
-        # Transform the single customer's data using the pipeline's preprocessor
-        X_transformed = preprocessor.transform(features_df)
-        shap_values = explainer.shap_values(X_transformed)
-        
-        # Handle SHAP output format (class 1 is churn)
-        individual_shap = shap_values[1][0] if isinstance(shap_values, list) else shap_values[0]
-        
-        # Extract feature names that the model memorized, ignoring SQLite data types
-        num_cols = preprocessor.transformers_[0][2] 
-        cat_cols = preprocessor.transformers_[1][2] 
-        
-        cat_encoder = preprocessor.named_transformers_['cat'].named_steps['onehot']
-        cat_names = cat_encoder.get_feature_names_out(cat_cols)
-        all_feature_names = list(num_cols) + list(cat_names)
-        
-        # Map SHAP values to feature names and find the top driver for churn (highest positive value)
-        impacts = {name: val for name, val in zip(all_feature_names, individual_shap)}
-        top_driver = sorted(impacts.items(), key=lambda item: item[1], reverse=True)[0]
-        
-        # Clean up the feature name for the frontend (e.g., "Complain" -> "Complain")
-        top_risk_factor = top_driver[0].replace('_', ' ')
-        
-        # Handle missing (NaN/None) values for the dashboard display
-        # If Tenure or Complain is missing in the DB, default it to 0 for the UI
-        raw_tenure = customer_data['Tenure'].values[0]
-        raw_complain = customer_data['Complain'].values[0]
-        
-        safe_tenure = int(raw_tenure) if pd.notna(raw_tenure) else 0
-        safe_complain = int(raw_complain) if pd.notna(raw_complain) else 0
-
-        # Log to database
+        # Log to DB
         cursor = conn.cursor()
-        cursor.execute(
-            "INSERT INTO predictions (CustomerID, churn_probability) VALUES (?, ?)",
-            (customer_id, float(probability))
-        )
+        cursor.execute("INSERT INTO predictions (CustomerID, churn_probability) VALUES (?, ?)", (customer_id, float(probability)))
         conn.commit()
         conn.close()
         
+        # Convert the customer's raw data to a dictionary so the frontend can pre-fill the manual form
+        raw_features = features_df.iloc[0].to_dict()
+        
         return jsonify({
+            'source': 'database',
             'customer_id': customer_id,
             'churn_probability': round(probability * 100, 2),
             'is_at_risk': is_at_risk,
-            'tenure': safe_tenure,
-            'complaints': safe_complain,
+            'top_risk_factor': top_risk_factor,
+            'raw_features': raw_features # Sending raw data back to UI
+        })
+        
+    except Exception as e:
+        print(traceback.format_exc())
+        return jsonify({'error': str(e)}), 500
+
+# --- ROUTE 2: Manual Simulation ---
+@app.route('/predict_manual', methods=['POST'])
+def predict_manual():
+    try:
+        data = request.get_json()
+        features_df = pd.DataFrame([data])
+        
+        probability, is_at_risk, top_risk_factor = calculate_shap_and_prediction(features_df)
+        
+        return jsonify({
+            'source': 'manual',
+            'churn_probability': round(probability * 100, 2),
+            'is_at_risk': is_at_risk,
             'top_risk_factor': top_risk_factor
         })
         
     except Exception as e:
+        print(traceback.format_exc())
         return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
