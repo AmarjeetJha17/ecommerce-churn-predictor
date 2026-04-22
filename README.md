@@ -77,7 +77,7 @@ This project uses modern Python packaging with `uv` for lightning-fast dependenc
      ```
    - **Using standard `pip`:**
      ```bash
-     pip install -e .
+     pip install -r requirements.txt
      ```
 
 3. **Initialize the Database:**
